@@ -17,17 +17,23 @@ html, body {
   font-family: 'Outfit', sans-serif;
   background: #0a0e1a;
   height: 100%;
+  height: 100dvh;
   width: 100%;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+  position: fixed;
+  inset: 0;
 }
 
 #root {
   width: 100%;
   height: 100%;
+  height: 100dvh;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -151,13 +157,15 @@ html, body {
   border: 2px solid rgba(255,255,255,0.08);
   background: rgba(255,255,255,0.05);
   color: white;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   text-align: center;
   outline: none;
   transition: all 0.3s var(--smooth);
   letter-spacing: 2px;
   font-family: 'Outfit', sans-serif;
+  -webkit-appearance: none;
+  appearance: none;
 }
 .field input::placeholder { color: rgba(255,255,255,0.25); letter-spacing: 1px; font-size: 13px; }
 .field input:focus {
@@ -748,4 +756,191 @@ html, body {
 @keyframes toastSlideUp {
   from { transform: translateX(-50%) translateY(20px); opacity: 0; }
   to { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
+
+/* ==================== CONNECTION OVERLAY ==================== */
+.connection-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  background: rgba(10, 14, 26, 0.97);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  animation: overlayIn 0.4s var(--smooth);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+}
+.connection-overlay.fade-out {
+  animation: overlayOut 0.8s var(--smooth) forwards;
+}
+@keyframes overlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes overlayOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+.connection-content {
+  text-align: center;
+  animation: scaleUp 0.5s var(--bounce);
+}
+.connection-spinner {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 24px;
+  position: relative;
+}
+.spinner-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 4px solid rgba(255,255,255,0.08);
+  border-top-color: var(--gold);
+  animation: spinRing 1s linear infinite;
+}
+@keyframes spinRing {
+  to { transform: rotate(360deg); }
+}
+.spinner-ball {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 32px;
+  animation: spinBall 2s ease-in-out infinite;
+}
+@keyframes spinBall {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  50% { transform: scale(1.1) rotate(15deg); }
+}
+.connection-check {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 24px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2E7D32, #4CAF50);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 36px;
+  font-weight: 900;
+  color: white;
+  animation: checkPop 0.4s var(--bounce);
+}
+@keyframes checkPop {
+  from { transform: scale(0); }
+  to { transform: scale(1); }
+}
+.connection-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: white;
+  margin-bottom: 6px;
+}
+.connection-sub {
+  font-size: 13px;
+  color: rgba(255,255,255,0.4);
+  max-width: 260px;
+  margin: 0 auto;
+  line-height: 1.5;
+}
+.connection-progress {
+  width: 200px;
+  height: 4px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 4px;
+  margin: 20px auto 0;
+  overflow: hidden;
+}
+.connection-progress-bar {
+  height: 100%;
+  width: 40%;
+  background: linear-gradient(90deg, var(--gold), #FF8F00);
+  border-radius: 4px;
+  animation: progressSlide 1.5s ease-in-out infinite;
+}
+@keyframes progressSlide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+
+/* ==================== CONNECTION DOT ==================== */
+.connection-dot {
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  z-index: 100;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.connection-dot.connected .connection-dot-inner {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: #4CAF50;
+  display: block;
+  box-shadow: 0 0 6px rgba(76,175,80,0.5);
+}
+.connection-dot.connecting .connection-dot-inner,
+.connection-dot.disconnected .connection-dot-inner {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: #FF9800;
+  display: block;
+  animation: pulseDot 1s infinite;
+}
+.connection-dot.disconnected .connection-dot-inner {
+  background: #EF5350;
+}
+
+/* ==================== REMATCH UI ==================== */
+.rematch-section {
+  margin-top: 8px;
+}
+.btn-dim {
+  width: 100%;
+  padding: 12px 20px;
+  border-radius: 14px;
+  border: 2px solid rgba(255,255,255,0.1);
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.5);
+  cursor: pointer;
+  transition: all 0.2s var(--smooth);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 10px;
+  font-family: 'Outfit', sans-serif;
+  background: rgba(255,255,255,0.04);
+}
+.btn-dim:active { transform: scale(0.97); background: rgba(255,255,255,0.08); }
+.rematch-waiting {
+  text-align: center;
+  padding: 8px 0;
+}
+.rematch-waiting-text {
+  font-size: 13px;
+  color: rgba(255,255,255,0.5);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.rematch-nudge {
+  margin-top: 8px;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, rgba(249,168,37,0.15), rgba(255,214,0,0.08));
+  border: 1px solid rgba(255,214,0,0.2);
+  border-radius: 10px;
+  color: var(--gold);
+  font-size: 13px;
+  font-weight: 700;
+  animation: nudgePulse 1.5s ease-in-out infinite alternate;
+}
+@keyframes nudgePulse {
+  from { box-shadow: 0 0 0 rgba(255,214,0,0); }
+  to { box-shadow: 0 0 12px rgba(255,214,0,0.15); }
 }

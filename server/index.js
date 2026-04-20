@@ -15,6 +15,11 @@ const logic = require('./gameLogic');
 
 const rooms = {};
 
+// ── HEALTH CHECK (for Render wake-up detection) ──
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', uptime: process.uptime() });
+});
+
 // ── ROOM CLEANUP ──
 function cleanupRoom(roomId) {
   const room = rooms[roomId];
@@ -237,6 +242,56 @@ io.on('connection', (socket) => {
     } else {
       io.to(roomId).emit('room_update', logic.sanitizeRoom(room));
     }
+  });
+
+  // ── REQUEST REMATCH ──
+  socket.on('request_rematch', ({ roomId, playerId }) => {
+    const room = rooms[roomId];
+    if (!room || room.gameState !== 'game_over') return;
+    const player = room.players.find(p => p.id === playerId);
+    if (!player) return;
+
+    room.rematchRequests[playerId] = true;
+
+    // Check if both players want rematch
+    const allReady = room.players.every(p => room.rematchRequests[p.id]);
+    if (allReady && room.players.length === 2) {
+      logic.resetRoomForRematch(room);
+      io.to(roomId).emit('room_update', logic.sanitizeRoom(room));
+    } else {
+      io.to(roomId).emit('room_update', logic.sanitizeRoom(room));
+    }
+  });
+
+  // ── CANCEL REMATCH ──
+  socket.on('cancel_rematch', ({ roomId, playerId }) => {
+    const room = rooms[roomId];
+    if (!room || room.gameState !== 'game_over') return;
+    delete room.rematchRequests[playerId];
+    io.to(roomId).emit('room_update', logic.sanitizeRoom(room));
+  });
+
+  // ── LEAVE GAME (after game over, back to lobby) ──
+  socket.on('leave_game', ({ roomId, playerId }) => {
+    const room = rooms[roomId];
+    if (!room) return;
+
+    const leavingPlayer = room.players.find(p => p.id === playerId);
+    const leavingName = leavingPlayer?.name || 'Opponent';
+
+    socket.leave(roomId);
+
+    // Notify remaining player
+    const remaining = room.players.find(p => p.id !== playerId);
+    if (remaining) {
+      const remainingSocket = io.sockets.sockets.get(remaining.socketId);
+      if (remainingSocket) {
+        remainingSocket.emit('opponent_left', leavingName);
+      }
+    }
+
+    // Cleanup room since game is over and a player left
+    cleanupRoom(roomId);
   });
 });
 

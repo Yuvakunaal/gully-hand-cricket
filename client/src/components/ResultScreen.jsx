@@ -1,6 +1,6 @@
 import React from 'react';
 
-const ResultScreen = ({ room, playerId, onPlayAgain }) => {
+const ResultScreen = ({ room, playerId, onRematch, onCancelRematch, onLeaveGame }) => {
   const isWinner = room.winnerId === playerId;
   const isTie = room.winnerId === 'tie';
 
@@ -9,6 +9,10 @@ const ResultScreen = ({ room, playerId, onPlayAgain }) => {
 
   const myScore = room.finalScores?.[playerId] ?? 0;
   const oppScore = room.finalScores?.[opp?.id] ?? 0;
+
+  const iRequested = room.rematchRequests?.[playerId] === true;
+  const oppRequested = room.rematchRequests?.[opp?.id] === true;
+  const bothReady = iRequested && oppRequested;
 
   return (
     <div className="glass-card result-screen">
@@ -41,9 +45,44 @@ const ResultScreen = ({ room, playerId, onPlayAgain }) => {
       </div>
 
       <p className="result-detail">{room.lastActionLog}</p>
-      <button className="btn btn-gold" onClick={onPlayAgain}>
-        🔥 Play Again
-      </button>
+
+      {/* Rematch Section */}
+      {!bothReady && (
+        <div className="rematch-section">
+          {!iRequested ? (
+            <>
+              <button className="btn btn-gold" onClick={onRematch}>
+                🔥 Rematch
+              </button>
+              <button className="btn btn-dim" onClick={onLeaveGame}>
+                🏠 Back to Lobby
+              </button>
+            </>
+          ) : (
+            <div className="rematch-waiting">
+              <div className="rematch-waiting-text">
+                <span className="pulse-dot"></span>
+                Waiting for {opp?.name || 'opponent'} to accept...
+              </div>
+              {oppRequested && (
+                <div className="rematch-accepted-text">
+                  Opponent accepted! Starting...
+                </div>
+              )}
+              <button className="btn btn-dim" onClick={onCancelRematch} style={{marginTop: 8}}>
+                ✕ Cancel
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Show if opponent requested first */}
+      {oppRequested && !iRequested && (
+        <div className="rematch-nudge">
+          ⚡ {opp?.name} wants a rematch!
+        </div>
+      )}
     </div>
   );
 };

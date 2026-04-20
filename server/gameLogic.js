@@ -18,7 +18,10 @@ function createRoom(roomId, totalOvers = 1) {
     _tossDelay: null,
     lastActionLog: null,
     ballPhase: 'waiting_input',
-    serverTime: Date.now()
+    serverTime: Date.now(),
+    rematchRequests: {},
+    winnerId: null,
+    finalScores: null
   };
 }
 
@@ -186,10 +189,42 @@ function determineWinner(room) {
   }
 }
 
+function resetRoomForRematch(room) {
+  clearAllTimers(room);
+
+  // Reset game state but keep players & room identity
+  room.gameState = 'toss';
+  room.tossResult = null;
+  room.tossCalledChoice = null;
+  room.tossWinnerId = null;
+  room.currentBall = 0;
+  room.timerExpiry = null;
+  room.targetScore = null;
+  room.lastActionLog = null;
+  room.ballPhase = 'waiting_input';
+  room.winnerId = null;
+  room.finalScores = null;
+  room.rematchRequests = {};
+
+  // Pick new toss caller randomly
+  const callerIndex = Math.floor(Math.random() * 2);
+  room.tossCallerId = room.players[callerIndex].id;
+
+  // Reset player stats but keep identity
+  room.players.forEach(p => {
+    p.score = 0;
+    p.totalScore = 0;
+    p.currentInput = null;
+    p.lastInput = null;
+    p.role = null;
+  });
+}
+
 module.exports = {
   createRoom,
   sanitizeRoom,
   clearAllTimers,
   startBallTimer,
-  resolveBall
+  resolveBall,
+  resetRoomForRematch
 };

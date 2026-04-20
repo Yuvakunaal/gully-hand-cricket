@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
 
-const Lobby = ({ onJoin, playerName, matchHistory = [] }) => {
+const Lobby = ({ onJoin, playerName, matchHistory = [], disabled = false }) => {
   const [name, setName] = useState(playerName || '');
   const [roomId, setRoomId] = useState('');
   const [overs, setOvers] = useState(1);
 
   const handleCreate = () => {
+    if (disabled) return;
     const newRoomId = String(Math.floor(10000 + Math.random() * 90000));
     onJoin(newRoomId, name, overs, true);
   };
 
   const handleJoin = () => {
+    if (disabled) return;
     const code = roomId.trim();
     if (code.length === 5 && /^\d{5}$/.test(code)) {
       onJoin(code, name, null, false);
@@ -59,7 +61,7 @@ const Lobby = ({ onJoin, playerName, matchHistory = [] }) => {
           </div>
         </div>
 
-        <button className="btn btn-blue" onClick={handleCreate} disabled={!name.trim()}>
+        <button className="btn btn-blue" onClick={handleCreate} disabled={!name.trim() || disabled}>
           ⚡ Create Match
         </button>
 
@@ -76,7 +78,7 @@ const Lobby = ({ onJoin, playerName, matchHistory = [] }) => {
           />
         </div>
 
-        <button className="btn btn-red" onClick={handleJoin} disabled={roomId.trim().length !== 5 || !name.trim()}>
+        <button className="btn btn-red" onClick={handleJoin} disabled={roomId.trim().length !== 5 || !name.trim() || disabled}>
           🎯 Join Match
         </button>
       </div>
