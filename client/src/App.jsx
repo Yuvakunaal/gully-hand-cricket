@@ -5,6 +5,7 @@ import Toss from './components/Toss';
 import GameArea from './components/GameArea';
 import ResultScreen from './components/ResultScreen';
 import ConnectionOverlay from './components/ConnectionOverlay';
+import BotMatch from './components/BotMatch';
 import { nanoid } from 'nanoid';
 import './index.css';
 
@@ -30,6 +31,7 @@ function App() {
   const [matchHistory, setMatchHistory] = useState([]);
   const [lastSavedGameId, setLastSavedGameId] = useState(null);
   const [toastMessage, setToastMessage] = useState('');
+  const [botOvers, setBotOvers] = useState(1);
   const [connectionStatus, setConnectionStatus] = useState(
     socket.connected ? 'connected' : 'connecting'
   );
@@ -164,6 +166,15 @@ function App() {
     });
   }, [playerId, playerName]);
 
+  const handlePlayBot = useCallback((name, overs) => {
+    if (name) {
+      setPlayerName(name);
+      localStorage.setItem('hc_player_name', name);
+    }
+    setBotOvers(overs || 1);
+    setScreen('bot_game');
+  }, []);
+
   const handleTossCall = useCallback((choice) => {
     if (room) socket.emit('toss_call', { roomId: room.id, playerId, choice });
   }, [room, playerId]);
@@ -227,9 +238,18 @@ function App() {
         {screen === 'lobby' && (
           <Lobby
             onJoin={handleJoin}
+            onPlayBot={handlePlayBot}
             playerName={playerName}
             matchHistory={matchHistory}
             disabled={isDisconnected}
+          />
+        )}
+
+        {screen === 'bot_game' && (
+          <BotMatch
+            playerName={playerName}
+            overs={botOvers}
+            onExit={() => setScreen('lobby')}
           />
         )}
 

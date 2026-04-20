@@ -9,6 +9,28 @@ const ResultScreen = ({ room, playerId, onRematch, onCancelRematch, onLeaveGame 
 
   const myScore = room.finalScores?.[playerId] ?? 0;
   const oppScore = room.finalScores?.[opp?.id] ?? 0;
+  const margin = Math.abs(myScore - oppScore);
+
+  let resultDetail = room.lastActionLog;
+  if (!isTie) {
+    // Determine who batted first at game_over. 
+    // In inning 2, roles swap. The one whose current role is 'bowl' batted first.
+    const iBattedFirst = me?.role === 'bowl';
+
+    if (isWinner) {
+      if (iBattedFirst) {
+        resultDetail = `WON! Defended and won by ${margin} runs 🏆`;
+      } else {
+        resultDetail = `WON! Chased and won by ${margin} runs 🏆`;
+      }
+    } else {
+      if (iBattedFirst) {
+        resultDetail = `LOST! Couldn't defend by ${margin} runs 😔`;
+      } else {
+        resultDetail = `LOST! Couldn't chase by ${margin} runs 😔`;
+      }
+    }
+  }
 
   const iRequested = room.rematchRequests?.[playerId] === true;
   const oppRequested = room.rematchRequests?.[opp?.id] === true;
@@ -44,7 +66,7 @@ const ResultScreen = ({ room, playerId, onRematch, onCancelRematch, onLeaveGame 
         </div>
       </div>
 
-      <p className="result-detail">{room.lastActionLog}</p>
+      <p className="result-detail">{resultDetail}</p>
 
       {/* Rematch Section */}
       {!bothReady && (

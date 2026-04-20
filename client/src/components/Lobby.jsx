@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const Lobby = ({ onJoin, playerName, matchHistory = [], disabled = false }) => {
+const Lobby = ({ onJoin, onPlayBot, playerName, matchHistory = [], disabled = false }) => {
   const [name, setName] = useState(playerName || '');
   const [roomId, setRoomId] = useState('');
   const [overs, setOvers] = useState(1);
@@ -9,6 +9,10 @@ const Lobby = ({ onJoin, playerName, matchHistory = [], disabled = false }) => {
     if (disabled) return;
     const newRoomId = String(Math.floor(10000 + Math.random() * 90000));
     onJoin(newRoomId, name, overs, true);
+  };
+
+  const handlePlayBot = () => {
+    onPlayBot(name, overs);
   };
 
   const handleJoin = () => {
@@ -61,8 +65,11 @@ const Lobby = ({ onJoin, playerName, matchHistory = [], disabled = false }) => {
           </div>
         </div>
 
-        <button className="btn btn-blue" onClick={handleCreate} disabled={!name.trim() || disabled}>
-          ⚡ Create Match
+        <button className="btn btn-blue" onClick={handleCreate} disabled={!name.trim() || disabled} style={{marginBottom: '10px'}}>
+          🤝🏻 Play with friends
+        </button>
+        <button className="btn btn-gold" onClick={handlePlayBot} disabled={!name.trim()} style={{marginBottom: '10px'}}>
+          🤖 Play with Bot
         </button>
 
         <div className="divider-row">OR JOIN</div>
