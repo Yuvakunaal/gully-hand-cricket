@@ -1,6 +1,167 @@
 import React, { useState, useEffect } from 'react';
 import AnimatedNumber from './AnimatedNumber';
 
+// --- STOCKFISH ENGINE FOR HAND CRICKET ---
+// Uses backward induction Dynamic Programming to solve the zero-sum game
+// for every possible ball & run state, finding the exact Nash Equilibrium.
+const HandCricketEngine = (() => {
+  let in1DP = null;
+  let in2DP = null;
+  let maxBallsComputed = 0;
+  let maxRunsComputed = 0;
+
+  const solveZeroSum = (v_arr) => {
+    // Sort descending keeping original index
+    const sorted = v_arr.map((v, i) => ({ v, idx: i })).sort((a, b) => b.v - a.v);
+    let S = [];
+    let V_star = 0;
+    let sum_inv = 0;
+    
+    for (let k = 1; k <= 6; k++) {
+      const u_k = sorted[k-1].v;
+      if (u_k === 0) {
+        if (k === 1) return { V: 0, P: [1/6,1/6,1/6,1/6,1/6,1/6], Q: [1/6,1/6,1/6,1/6,1/6,1/6] };
+        break;
+      }
+      const next_sum_inv = sum_inv + 1 / u_k;
+      const V_k = (k - 1) / next_sum_inv;
+      
+      // Include strategies that are equal or better than the equilibrium threshold
+      if (u_k >= V_k - 1e-9) {
+        S.push(sorted[k-1]);
+        sum_inv = next_sum_inv;
+        V_star = V_k;
+      } else {
+        break;
+      }
+    }
+    
+    const P = [0, 0, 0, 0, 0, 0];
+    const Q = [0, 0, 0, 0, 0, 0];
+    for (let item of S) {
+      Q[item.idx] = Math.max(0, 1 - V_star / item.v);
+      P[item.idx] = Math.max(0, 1 / (item.v * sum_inv));
+    }
+    
+    // Normalize probabilities to avoid float issues
+    const sumP = P.reduce((a, b) => a + b, 0);
+    const sumQ = Q.reduce((a, b) => a + b, 0);
+    for (let i = 0; i < 6; i++) {
+      P[i] = sumP > 0 ? P[i] / sumP : 1/6;
+      Q[i] = sumQ > 0 ? Q[i] / sumQ : 1/6;
+    }
+    
+    return { V: V_star, P, Q };
+  };
+
+  const ensureComputed = (balls, runs) => {
+    if (balls <= maxBallsComputed && (runs === undefined || runs <= maxRunsComputed)) {
+      return;
+    }
+    
+    const newMaxBalls = Math.max(maxBallsComputed, balls + 10);
+    const newMaxRuns = Math.max(maxRunsComputed, (runs || newMaxBalls * 6) + 30);
+    
+    // Inning 1 DP: Maximize Expected Runs
+    const newIn1 = new Array(newMaxBalls + 1).fill(null);
+    newIn1[0] = { V: 0, P: [1/6,1/6,1/6,1/6,1/6,1/6], Q: [1/6,1/6,1/6,1/6,1/6,1/6] };
+    for (let b = 1; b <= newMaxBalls; b++) {
+      const v_arr = [];
+      for (let i = 1; i <= 6; i++) {
+        v_arr.push(i + newIn1[b-1].V); // Expected runs if play continues
+      }
+      newIn1[b] = solveZeroSum(v_arr);
+    }
+    in1DP = newIn1;
+
+    // Inning 2 DP: Maximize Win Probability
+    const newIn2 = Array(newMaxBalls + 1).fill(null).map(() => Array(newMaxRuns + 1).fill(null));
+    for (let r = 0; r <= newMaxRuns; r++) {
+      let val = 0;
+      if (r <= 0) val = 1; // Win
+      else if (r === 1) val = 0.5; // Tie
+      newIn2[0][r] = { V: val, P: [1/6,1/6,1/6,1/6,1/6,1/6], Q: [1/6,1/6,1/6,1/6,1/6,1/6] };
+    }
+    for (let b = 0; b <= newMaxBalls; b++) {
+      newIn2[b][0] = { V: 1, P: [1/6,1/6,1/6,1/6,1/6,1/6], Q: [1/6,1/6,1/6,1/6,1/6,1/6] };
+    }
+    
+    for (let b = 1; b <= newMaxBalls; b++) {
+      for (let r = 1; r <= newMaxRuns; r++) {
+        const v_arr = [];
+        for (let i = 1; i <= 6; i++) {
+          const next_r = Math.max(0, r - i);
+          v_arr.push(newIn2[b-1][next_r].V);
+        }
+        newIn2[b][r] = solveZeroSum(v_arr);
+      }
+    }
+    
+    in2DP = newIn2;
+    maxBallsComputed = newMaxBalls;
+    maxRunsComputed = newMaxRuns;
+  };
+
+  const sampleWeighted = (probs) => {
+    const r = Math.random();
+    let sum = 0;
+    for (let i = 0; i < 6; i++) {
+      sum += probs[i];
+      if (r <= sum) return i + 1;
+    }
+    return 6;
+  };
+
+  const getExploitativeProbs = (baseProbs, role, state, history) => {
+    if (!history || history.length < 2) return baseProbs;
+    
+    // Count player frequencies with Laplace smoothing
+    const counts = [1, 1, 1, 1, 1, 1];
+    history.forEach(num => { if (num >= 1 && num <= 6) counts[num - 1]++; });
+    const totalCount = counts.reduce((a, b) => a + b, 0);
+    const h = counts.map(c => c / totalCount);
+
+    const v = state.v_arr || [1, 2, 3, 4, 5, 6]; // Fallback values
+    let exploitProbs = [0, 0, 0, 0, 0, 0];
+    
+    if (role === 'bowl') {
+      // Bot is bowling. It wants to maximize h[i] * v[i] (predict player's high-value moves)
+      const metrics = h.map((prob, i) => prob * v[i]);
+      const sumMetrics = metrics.reduce((a, b) => a + b, 0);
+      exploitProbs = metrics.map(m => sumMetrics > 0 ? m / sumMetrics : 1/6);
+    } else {
+      // Bot is batting. It wants to maximize v[i] * (1 - h[i]) (avoid player's bowling habits)
+      const metrics = v.map((val, i) => val * (1 - h[i]));
+      const sumMetrics = metrics.reduce((a, b) => a + b, 0);
+      exploitProbs = metrics.map(m => sumMetrics > 0 ? m / sumMetrics : 1/6);
+    }
+
+    // Blend 50% Nash Equilibrium with 50% Exploitative Adaption
+    const blended = baseProbs.map((p, i) => 0.5 * p + 0.5 * exploitProbs[i]);
+    const sumBlended = blended.reduce((a, b) => a + b, 0);
+    return blended.map(p => p / sumBlended);
+  };
+
+  return {
+    getMoveInning1: (ballsRemaining, role, history) => {
+      ensureComputed(ballsRemaining);
+      const state = in1DP[ballsRemaining];
+      const baseProbs = role === 'bat' ? state.P : state.Q;
+      const finalProbs = getExploitativeProbs(baseProbs, role, state, history);
+      return sampleWeighted(finalProbs);
+    },
+    getMoveInning2: (ballsRemaining, runsRequired, role, history) => {
+      if (runsRequired <= 0) return Math.floor(Math.random() * 6) + 1;
+      ensureComputed(ballsRemaining, runsRequired);
+      const state = in2DP[ballsRemaining][runsRequired];
+      const baseProbs = role === 'bat' ? state.P : state.Q;
+      const finalProbs = getExploitativeProbs(baseProbs, role, state, history);
+      return sampleWeighted(finalProbs);
+    }
+  };
+})();
+// --- END STOCKFISH ENGINE ---
+
 const BotMatch = ({ playerName, overs, onExit }) => {
   const [gameState, setGameState] = useState('toss'); // toss, toss_flipping, toss_choose, playing_inning_1, inning_transition, playing_inning_2, game_over
   const [tossCaller, setTossCaller] = useState('player'); // randomly assigned at start
@@ -23,6 +184,7 @@ const BotMatch = ({ playerName, overs, onExit }) => {
   const [playerInput, setPlayerInput] = useState(null);
   const [botInput, setBotInput] = useState(null);
   const [lastActionLog, setLastActionLog] = useState('');
+  const [playerHistory, setPlayerHistory] = useState([]); // Track habits
   
   const [showToast, setShowToast] = useState(false);
   const [isWicket, setIsWicket] = useState(false);
@@ -53,6 +215,7 @@ const BotMatch = ({ playerName, overs, onExit }) => {
     setPlayerInput(null);
     setBotInput(null);
     setLastActionLog('');
+    setPlayerHistory([]);
   };
 
   // Bot calls toss logic
@@ -111,11 +274,28 @@ const BotMatch = ({ playerName, overs, onExit }) => {
     setBallPhase('waiting_input');
   };
 
+  const getThinkingBotMove = (history) => {
+    const ballsRemaining = totalBalls - currentBall + 1;
+    
+    if (gameState === 'playing_inning_2') {
+      const isBotBatting = botRole === 'bat';
+      const batterScore = isBotBatting ? botScore : playerScore;
+      const runsRequiredToWin = targetScore + 1 - batterScore;
+      
+      return HandCricketEngine.getMoveInning2(ballsRemaining, runsRequiredToWin, botRole, history);
+    }
+    
+    return HandCricketEngine.getMoveInning1(ballsRemaining, botRole, history);
+  };
+
   const handlePlayHand = (num) => {
     if (ballPhase !== 'waiting_input') return;
 
+    const newHistory = [...playerHistory, num];
+    setPlayerHistory(newHistory);
+
     setPlayerInput(num);
-    const botNum = Math.floor(Math.random() * 6) + 1;
+    const botNum = getThinkingBotMove(newHistory);
     setBotInput(botNum);
     setBallPhase('showing_result');
 
